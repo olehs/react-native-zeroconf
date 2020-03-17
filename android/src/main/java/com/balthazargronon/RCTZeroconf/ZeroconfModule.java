@@ -6,7 +6,6 @@ import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 
-import com.facebook.react.bridge.NativeMap;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
@@ -38,9 +37,10 @@ public class ZeroconfModule extends ReactContextBaseJavaModule {
     public static final String EVENT_REMOVE = "RNZeroconfRemove";
     public static final String EVENT_RESOLVE = "RNZeroconfResolved";
 
-    public static final String EVENT_PUBLISHED = "RNZeroconfServiceRegistered";
-    public static final String EVENT_UNREGISTERED = "RNZeroconfServiceUnregistered";
+    public static final String EVENT_REGISTER = "RNZeroconfServiceRegistered";
+    public static final String EVENT_UNREGISTER = "RNZeroconfServiceUnregistered";
 
+    public static final String KEY_ERROR_CODE = "errorCode";
     public static final String KEY_SERVICE_NAME = "name";
     public static final String KEY_SERVICE_FULL_NAME = "fullName";
     public static final String KEY_SERVICE_HOST = "host";
@@ -82,7 +82,7 @@ public class ZeroconfModule extends ReactContextBaseJavaModule {
         this.stop();
 
         if (multicastLock == null) {
-            WifiManager wifi = (WifiManager) getReactApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            WifiManager wifi = (WifiManager) getReactApplicationContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
             multicastLock = wifi.createMulticastLock("multicastLock");
             multicastLock.setReferenceCounted(true);
             multicastLock.acquire();
@@ -92,13 +92,13 @@ public class ZeroconfModule extends ReactContextBaseJavaModule {
             @Override
             public void onStartDiscoveryFailed(String serviceType, int errorCode) {
                 String error = "Starting service discovery failed with code: " + errorCode;
-                sendEvent(getReactApplicationContext(), EVENT_ERROR, error);
+                sendEvent(getReactApplicationContext(), EVENT_START, error);
             }
 
             @Override
             public void onStopDiscoveryFailed(String serviceType, int errorCode) {
                 String error = "Stopping service discovery failed with code: " + errorCode;
-                sendEvent(getReactApplicationContext(), EVENT_ERROR, error);
+                sendEvent(getReactApplicationContext(), EVENT_STOP, error);
             }
 
             @Override
@@ -181,8 +181,9 @@ public class ZeroconfModule extends ReactContextBaseJavaModule {
     }
 
     protected
-    WritableMap serviceInfoToMap(NsdServiceInfo serviceInfo) {
+    WritableMap serviceInfoToMap(NsdServiceInfo serviceInfo, int errorCode) {
         WritableMap service = new WritableNativeMap();
+        service.putInt(KEY_ERROR_CODE, errorCode);
         service.putString(KEY_SERVICE_NAME, serviceInfo.getServiceName());
         final InetAddress host = serviceInfo.getHost();
         final String fullServiceName;
@@ -226,14 +227,14 @@ public class ZeroconfModule extends ReactContextBaseJavaModule {
             if (errorCode == NsdManager.FAILURE_ALREADY_ACTIVE) {
                 mNsdManager.resolveService(serviceInfo, this);
             } else {
-                String error = "Resolving service failed with code: " + errorCode;
-                sendEvent(getReactApplicationContext(), EVENT_ERROR, error);
+                WritableMap service = serviceInfoToMap(serviceInfo, errorCode);
+                sendEvent(getReactApplicationContext(), EVENT_RESOLVE, service);
             }
         }
 
         @Override
         public void onServiceResolved(NsdServiceInfo serviceInfo) {
-            WritableMap service = serviceInfoToMap(serviceInfo);
+            WritableMap service = serviceInfoToMap(serviceInfo, 0);
             sendEvent(getReactApplicationContext(), EVENT_RESOLVE, service);
         }
     }
@@ -241,34 +242,36 @@ public class ZeroconfModule extends ReactContextBaseJavaModule {
     private class ServiceRegistrationListener implements NsdManager.RegistrationListener {
 
         @Override
-        public void onServiceRegistered(NsdServiceInfo NsdServiceInfo) {
+        public void onServiceRegistered(NsdServiceInfo serviceInfo) {
             // Save the service name.  Android may have changed it in order to
             // resolve a conflict, so update the name you initially requested
             // with the name Android actually used.
 
-            final String serviceName = NsdServiceInfo.getServiceName();
+            final String serviceName = serviceInfo.getServiceName();
             mPublishedServices.put(serviceName, this);
 
-            WritableMap service = serviceInfoToMap(NsdServiceInfo);
-            sendEvent(getReactApplicationContext(), EVENT_PUBLISHED, service);
+            WritableMap service = serviceInfoToMap(serviceInfo, 0);
+            sendEvent(getReactApplicationContext(), EVENT_REGISTER, service);
         }
 
         @Override
         public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-            // Registration failed!  Put debugging code here to determine why.
+            final WritableMap service = serviceInfoToMap(serviceInfo, errorCode);
+            sendEvent(getReactApplicationContext(), EVENT_REGISTER, service);
         }
 
         @Override
-        public void onServiceUnregistered(NsdServiceInfo nsdServiceInfo) {
+        public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
             // Service has been unregistered.  This only happens when you call
             // NsdManager.unregisterService() and pass in this listener.
-            final WritableMap service = serviceInfoToMap(nsdServiceInfo);
-            sendEvent(getReactApplicationContext(), EVENT_UNREGISTERED, service);
+            final WritableMap service = serviceInfoToMap(serviceInfo, 0);
+            sendEvent(getReactApplicationContext(), EVENT_UNREGISTER, service);
         }
 
         @Override
         public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-            // Unregistration failed.  Put debugging code here to determine why.
+            final WritableMap service = serviceInfoToMap(serviceInfo, errorCode);
+            sendEvent(getReactApplicationContext(), EVENT_UNREGISTER, service);
         }
     }
 

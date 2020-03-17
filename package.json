@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/Apercu/react-native-zeroconf.git"
+    "url": "git://github.com/olehs/react-native-zeroconf.git"
   },
   "files": [
     "dist",
@@ -31,7 +31,7 @@
     "discovery"
   ],
   "author": "Balthazar Gronon <bgronon@gmail.com>",
-  "homepage": "https://github.com/balthazar/react-native-zeroconf",
+  "homepage": "https://github.com/olehs/react-native-zeroconf",
   "license": "MIT",
   "dependencies": {
     "events": "^3.0.0"

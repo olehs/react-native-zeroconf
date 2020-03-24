@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.io.UnsupportedEncodingException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Created by Jeremy White on 8/1/2016.
@@ -44,6 +46,8 @@ public class ZeroconfModule extends ReactContextBaseJavaModule {
     public static final String KEY_SERVICE_NAME = "name";
     public static final String KEY_SERVICE_FULL_NAME = "fullName";
     public static final String KEY_SERVICE_HOST = "host";
+    public static final String KEY_SERVICE_TYPE = "type";
+    public static final String KEY_SERVICE_PROTOCOL = "protocol";
     public static final String KEY_SERVICE_PORT = "port";
     public static final String KEY_SERVICE_ADDRESSES = "addresses";
     public static final String KEY_SERVICE_TXT = "txt";
@@ -187,11 +191,19 @@ public class ZeroconfModule extends ReactContextBaseJavaModule {
         service.putString(KEY_SERVICE_NAME, serviceInfo.getServiceName());
         final InetAddress host = serviceInfo.getHost();
         final String fullServiceName;
+        final String serviceType = serviceInfo.getServiceType();
         if (host == null) {
             fullServiceName = serviceInfo.getServiceName();
         } else {
-            fullServiceName = host.getHostName() + serviceInfo.getServiceType();
+            fullServiceName = host.getHostName() + serviceType;
             service.putString(KEY_SERVICE_HOST, host.getHostName());
+
+            final Pattern pattern = Pattern.compile("\\._(.+)\\._(\\w+)$");
+            final Matcher matcher = pattern.matcher(serviceType);
+            if (matcher.find()) {
+                service.putString(KEY_SERVICE_TYPE, matcher.group(1));
+                service.putString(KEY_SERVICE_PROTOCOL, matcher.group(2));
+            }
 
             WritableArray addresses = new WritableNativeArray();
             addresses.pushString(host.getHostAddress());
@@ -199,6 +211,7 @@ public class ZeroconfModule extends ReactContextBaseJavaModule {
             service.putArray(KEY_SERVICE_ADDRESSES, addresses);
         }
         service.putString(KEY_SERVICE_FULL_NAME, fullServiceName);
+
         service.putInt(KEY_SERVICE_PORT, serviceInfo.getPort());
 
         WritableMap txtRecords = new WritableNativeMap();

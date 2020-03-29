@@ -17,10 +17,40 @@
 @end
 
 @implementation RNZeroconf
+{
+    bool hasListeners;
+}
 
 @synthesize bridge = _bridge;
 
 RCT_EXPORT_MODULE()
+
+- (NSArray<NSString *> *)supportedEvents {
+    return @[
+        @"RNZeroconfFound",
+        @"RNZeroconfRemove",
+        @"RNZeroconfStop",
+        @"RNZeroconfStart",
+        @"RNZeroconfResolved",
+        @"RNZeroconfServiceRegistered",
+        @"RNZeroconfServiceUnregistered",
+        @"RNZeroconfError"
+    ];
+}
+
+- (void)startObserving {
+    hasListeners = true;
+}
+
+- (void)stopObserving {
+    hasListeners = false;
+}
+
+- (void)sendEvent:(NSString *)eventName body:(NSDictionary *)body {
+    if (hasListeners) {
+        [self sendEventWithName:eventName body:body];
+    }
+}
 
 RCT_EXPORT_METHOD(scan:(NSString *)type protocol:(NSString *)protocol domain:(NSString *)domain)
 {
@@ -53,7 +83,7 @@ RCT_EXPORT_METHOD(registerService:(NSString *)type
     const NSNetService *svc = [[NSNetService alloc] initWithDomain:domain type:[NSString stringWithFormat:@"_%@._%@.", type, protocol] name:name port:port];
     [svc setDelegate:self];
     [svc scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-
+    
     [svc publish];
     self.publishedServices[svc.name] = svc;
     NSLog(@"zeroconf publish called");
@@ -62,7 +92,7 @@ RCT_EXPORT_METHOD(registerService:(NSString *)type
 RCT_EXPORT_METHOD(unregisterService:(NSString *) serviceName)
 {
     NSNetService *svc = self.publishedServices[serviceName];
-
+    
     if (svc) {
         [svc stop];
     }
@@ -76,17 +106,17 @@ RCT_EXPORT_METHOD(unregisterService:(NSString *) serviceName)
                 moreComing:(BOOL)moreComing
 {
     if (service == nil) {
-      return;
+        return;
     }
-
+    
     NSDictionary *serviceInfo = [RNNetServiceSerializer serializeServiceToDictionary:service resolved:NO];
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"RNZeroconfFound" body:serviceInfo];
-
+    [self sendEvent:@"RNZeroconfFound" body:serviceInfo];
+    
     // resolving services must be strongly referenced or they will be garbage collected
     // and will never resolve or timeout.
     // source: http://stackoverflow.com/a/16130535/2715
     self.resolvingServices[service.name] = service;
-
+    
     service.delegate = self;
     [service resolveWithTimeout:5.0];
 }
@@ -97,11 +127,11 @@ RCT_EXPORT_METHOD(unregisterService:(NSString *) serviceName)
                 moreComing:(BOOL)moreComing
 {
     if (service == nil) {
-      return;
+        return;
     }
-
+    
     NSDictionary *serviceInfo = [RNNetServiceSerializer serializeServiceToDictionary:service resolved:NO];
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"RNZeroconfRemove" body:serviceInfo];
+    [self sendEvent:@"RNZeroconfRemove" body:serviceInfo];
 }
 
 // When the search fails.
@@ -114,13 +144,13 @@ RCT_EXPORT_METHOD(unregisterService:(NSString *) serviceName)
 // When the search stops.
 - (void) netServiceBrowserDidStopSearch:(NSNetServiceBrowser *)browser
 {
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"RNZeroconfStop" body:nil];
+    [self sendEvent:@"RNZeroconfStop" body:nil];
 }
 
 // When the search starts.
 - (void) netServiceBrowserWillSearch:(NSNetServiceBrowser *)browser
 {
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"RNZeroconfStart" body:nil];
+    [self sendEvent:@"RNZeroconfStart" body:nil];
 }
 
 #pragma mark - NSNetServiceDelegate
@@ -129,8 +159,8 @@ RCT_EXPORT_METHOD(unregisterService:(NSString *) serviceName)
 - (void) netServiceDidResolveAddress:(NSNetService *)sender
 {
     NSDictionary *serviceInfo = [RNNetServiceSerializer serializeServiceToDictionary:sender resolved:YES];
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"RNZeroconfResolved" body:serviceInfo];
-
+    [self sendEvent:@"RNZeroconfResolved" body:serviceInfo];
+    
     sender.delegate = nil;
     [self.resolvingServices removeObjectForKey:sender.name];
 }
@@ -140,7 +170,7 @@ RCT_EXPORT_METHOD(unregisterService:(NSString *) serviceName)
       didNotResolve:(NSDictionary *)errorDict
 {
     [self reportError:errorDict];
-
+    
     sender.delegate = nil;
     [self.resolvingServices removeObjectForKey:sender.name];
 }
@@ -155,32 +185,32 @@ RCT_EXPORT_METHOD(unregisterService:(NSString *) serviceName)
 {
     NSLog(@"zeroconf netServiceDidPublish");
     NSDictionary *serviceInfo = [RNNetServiceSerializer serializeServiceToDictionary:sender resolved:YES];
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"RNZeroconfServiceRegister" body:serviceInfo];
-
+    [self sendEvent:@"RNZeroconfServiceRegistered" body:serviceInfo];
+    
     self.publishedServices[sender.name] = sender;
-
+    
 }
 
 - (void)netService:(NSNetService *)sender
      didNotPublish:(NSDictionary<NSString *,NSNumber *> *)errorDict
 {
     NSLog(@"zeroconf netServiceDidNotPublish");
-
+    
     [self reportError:errorDict];
     NSLog(@"zeroconf %@", errorDict);
     sender.delegate = nil;
     [self.publishedServices removeObjectForKey:sender.name];
-
+    
 }
 
 - (void)netServiceDidStop:(NSNetService *)sender
 {
     sender.delegate = nil;
     [self.publishedServices removeObjectForKey:sender.name];
-
+    
     NSDictionary *serviceInfo = [RNNetServiceSerializer serializeServiceToDictionary:sender resolved:YES];
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"RNZeroconfServiceUnregistered" body:serviceInfo];
-
+    [self sendEvent:@"RNZeroconfServiceUnregistered" body:serviceInfo];
+    
 }
 
 #pragma mark - Class methods
@@ -188,24 +218,20 @@ RCT_EXPORT_METHOD(unregisterService:(NSString *) serviceName)
 - (instancetype) init
 {
     self = [super init];
-
+    
     if (self) {
         _resolvingServices = [[NSMutableDictionary alloc] init];
         _publishedServices = [[NSMutableDictionary alloc] init];
         _browser = [[NSNetServiceBrowser alloc] init];
         [_browser setDelegate:self];
     }
-
+    
     return self;
 }
 
 - (void) reportError:(NSDictionary *)errorDict
 {
-    for (int a = 0; a < errorDict.count; ++a) {
-        NSString *key = [[errorDict allKeys] objectAtIndex:a];
-        NSString *val = [errorDict objectForKey:key];
-        [self.bridge.eventDispatcher sendDeviceEventWithName:@"RNZeroconfError" body:val];
-    }
+    [self sendEvent:@"RNZeroconfError" body:errorDict];
 }
 
 @end

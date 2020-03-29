@@ -9,9 +9,9 @@
 #import <Foundation/Foundation.h>
 #import <React/RCTBridge.h>
 #import <React/RCTBridgeModule.h>
-#import <React/RCTEventDispatcher.h>
+#import <React/RCTEventEmitter.h>
 
-@interface RNZeroconf : NSObject <RCTBridgeModule, NSNetServiceBrowserDelegate, NSNetServiceDelegate>
+@interface RNZeroconf : RCTEventEmitter <RCTBridgeModule, NSNetServiceBrowserDelegate, NSNetServiceDelegate>
 
 @property (nonatomic, strong) NSNetServiceBrowser *browser;
 

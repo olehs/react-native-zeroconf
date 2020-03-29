@@ -1,7 +1,9 @@
-import { NativeModules, DeviceEventEmitter } from 'react-native'
+import { NativeModules, NativeEventEmitter } from 'react-native'
 import { EventEmitter } from 'events'
 
-const RNZeroconf = NativeModules.RNZeroconf
+const { RNZeroconf } = NativeModules
+
+const eventEmitter = new NativeEventEmitter(RNZeroconf)
 
 export default class Zeroconf extends EventEmitter {
   constructor(props) {
@@ -22,19 +24,19 @@ export default class Zeroconf extends EventEmitter {
       return this.emit('error', new Error('RNZeroconf listeners already in place.'))
     }
 
-    this._dListeners.start = DeviceEventEmitter.addListener('RNZeroconfStart', () =>
+    this._dListeners.start = eventEmitter.addListener('RNZeroconfStart', () =>
       this.emit('start'),
     )
 
-    this._dListeners.stop = DeviceEventEmitter.addListener('RNZeroconfStop', () =>
+    this._dListeners.stop = eventEmitter.addListener('RNZeroconfStop', () =>
       this.emit('stop'),
     )
 
-    this._dListeners.error = DeviceEventEmitter.addListener('RNZeroconfError', err =>
+    this._dListeners.error = eventEmitter.addListener('RNZeroconfError', err =>
       this.emit('error', err),
     )
 
-    this._dListeners.found = DeviceEventEmitter.addListener('RNZeroconfFound', service => {
+    this._dListeners.found = eventEmitter.addListener('RNZeroconfFound', service => {
       if (!service || !service.name) {
         return
       }
@@ -45,7 +47,7 @@ export default class Zeroconf extends EventEmitter {
       this.emit('update')
     })
 
-    this._dListeners.remove = DeviceEventEmitter.addListener('RNZeroconfRemove', service => {
+    this._dListeners.remove = eventEmitter.addListener('RNZeroconfRemove', service => {
       if (!service || !service.name) {
         return
       }
@@ -57,7 +59,7 @@ export default class Zeroconf extends EventEmitter {
       this.emit('update')
     })
 
-    this._dListeners.resolved = DeviceEventEmitter.addListener('RNZeroconfResolved', service => {
+    this._dListeners.resolved = eventEmitter.addListener('RNZeroconfResolved', service => {
       if (!service || !service.name) {
         return
       }
@@ -67,7 +69,7 @@ export default class Zeroconf extends EventEmitter {
       this.emit('update')
     })
 
-    this._dListeners.published = DeviceEventEmitter.addListener(
+    this._dListeners.published = eventEmitter.addListener(
       'RNZeroconfServiceRegistered',
       service => {
         if (!service || !service.name) {
@@ -79,7 +81,7 @@ export default class Zeroconf extends EventEmitter {
       },
     )
 
-    this._dListeners.unpublished = DeviceEventEmitter.addListener(
+    this._dListeners.unpublished = eventEmitter.addListener(
       'RNZeroconfServiceUnregistered',
       service => {
         if (!service || !service.name) {

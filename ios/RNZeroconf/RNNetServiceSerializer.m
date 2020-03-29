@@ -9,12 +9,14 @@
 #import "RNNetServiceSerializer.h"
 #include <arpa/inet.h>
 
-const NSString *kRNServiceKeysName = @"name";
-const NSString *kRNServiceKeysFullName = @"fullName";
+const NSString *kRNServiceKeysName      = @"name";
+const NSString *kRNServiceKeysFullName  = @"fullName";
 const NSString *kRNServiceKeysAddresses = @"addresses";
-const NSString *kRNServiceKeysHost = @"host";
-const NSString *kRNServiceKeysPort = @"port";
-const NSString *kRNServiceTxtRecords = @"txt";
+const NSString *kRNServiceKeysHost      = @"host";
+const NSString *kRNServiceKeysType      = @"type";
+const NSString *kRNServiceKeysProtocol  = @"protocol";
+const NSString *kRNServiceKeysPort      = @"port";
+const NSString *kRNServiceTxtRecords    = @"txt";
 
 @implementation RNNetServiceSerializer
 
@@ -29,6 +31,18 @@ const NSString *kRNServiceTxtRecords = @"txt";
         serviceInfo[kRNServiceKeysAddresses] = [self addressesFromService:service];
         serviceInfo[kRNServiceKeysHost] = service.hostName;
         serviceInfo[kRNServiceKeysPort] = @(service.port);
+
+        NSString *pattern = @"_(.+)\\._(\\w+)\\.$";
+        NSRange searchedRange = NSMakeRange(0, [service.type length]);
+        NSError *error = nil;
+        NSRegularExpression* regex = [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:&error];
+        NSArray* matches = [regex matchesInString:service.type options:0 range:searchedRange];
+        for (NSTextCheckingResult* match in matches) {
+            NSRange group1 = [match rangeAtIndex:1];
+            NSRange group2 = [match rangeAtIndex:2];
+            serviceInfo[kRNServiceKeysType] = [service.type substringWithRange:group1];
+            serviceInfo[kRNServiceKeysProtocol] = [service.type substringWithRange:group2];
+        }
         
         NSDictionary<NSString *, NSData *> *txtRecordDict = [NSNetService dictionaryFromTXTRecordData:service.TXTRecordData];
         

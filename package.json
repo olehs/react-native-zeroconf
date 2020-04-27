@@ -37,8 +37,8 @@
     "events": "^3.0.0"
   },
   "peerDependencies": {
-    "react": "^16.10.2",
-    "react-native": "^0.60.2"
+    "react": "^16.8.1",
+    "react-native": ">=0.60.0-rc.0 <1.0.x"
   },
   "devDependencies": {
     "babel-cli": "^6.26.0",
